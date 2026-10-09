@@ -1,0 +1,36 @@
+services:
+  qq-farm-bot:
+    build:
+      context: .
+      dockerfile: core/Dockerfile
+    image: qq-farm-bot:latest
+    container_name: qq-farm-bot
+    restart: unless-stopped
+
+    ports:
+      - "${ADMIN_PORT:-3007}:${ADMIN_PORT:-3007}" # 管理面板
+
+    volumes:
+      - ../data:/app/core/data
+
+    environment:
+      TZ: Asia/Shanghai
+      NODE_ENV: production
+      ADMIN_PORT: "${ADMIN_PORT:-3007}"
+      ADMIN_USERNAME: "${ADMIN_USERNAME:-admin}"
+      ADMIN_PASSWORD: "${ADMIN_PASSWORD:-admin}"
+      FARM_DATA_DIR: /app/core/data
+
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:$${ADMIN_PORT:-3007}/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+

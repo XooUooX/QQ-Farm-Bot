@@ -1,0 +1,183 @@
+<script setup lang="ts">
+import type { SystemConfig } from '@/composables/useAdminSystemConfig'
+import type { AdminAuthConfig } from '@/composables/useAdminSystemConfig'
+import BaseButton from '@/components/ui/BaseButton.vue'
+import BaseInput from '@/components/ui/BaseInput.vue'
+
+interface OptionItem {
+  label: string
+  value: string
+}
+
+const props = withDefaults(defineProps<{
+  section: 'system'
+  defaultSystemConfig: SystemConfig
+  platformOptions: OptionItem[]
+  osOptions: OptionItem[]
+  systemConfigSaving: boolean
+  adminAuthConfig: AdminAuthConfig
+  adminAuthSaving: boolean
+  showHeading?: boolean
+  showSave?: boolean
+}>(), {
+  showHeading: true,
+  showSave: true,
+})
+
+defineEmits<{
+  resetSystem: []
+  saveSystem: []
+  saveAdminAuth: []
+}>()
+
+const localSystemConfig = defineModel<SystemConfig>('localSystemConfig', { required: true })
+</script>
+
+<template>
+  <div class="space-y-4">
+    <h3 v-if="showHeading" class="text-lg text-gray-900 font-bold dark:text-gray-100">
+      系统配置
+    </h3>
+
+    <div v-if="props.section === 'system'" class="rounded-2xl bg-gray-50 px-4 py-3 text-sm text-gray-600 dark:bg-gray-900/40 dark:text-gray-300">
+      修改后会直接影响全局连接参数与微信登录行为，保存前建议再次核对目标环境。
+    </div>
+
+    <div class="space-y-4">
+      <div v-if="props.section === 'system'" class="border border-gray-200 rounded-lg bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
+        <h4 class="mb-3 flex items-center gap-2 text-base text-gray-900 font-bold dark:text-gray-100">
+          <div class="i-carbon-settings" />
+          系统配置
+        </h4>
+
+        <div class="grid gap-3 md:grid-cols-3">
+          <div class="rounded-2xl bg-gray-50 px-4 py-3 text-sm text-gray-700 dark:bg-gray-900/40 dark:text-gray-200">
+            <div class="text-xs text-gray-500 dark:text-gray-400">
+              当前平台
+            </div>
+            <div class="mt-1 font-semibold">
+              {{ platformOptions.find(option => option.value === localSystemConfig.platform)?.label || '未设置' }}
+            </div>
+          </div>
+          <div class="rounded-2xl bg-gray-50 px-4 py-3 text-sm text-gray-700 dark:bg-gray-900/40 dark:text-gray-200">
+            <div class="text-xs text-gray-500 dark:text-gray-400">
+              当前系统
+            </div>
+            <div class="mt-1 font-semibold">
+              {{ localSystemConfig.os }}
+            </div>
+          </div>
+          <div class="rounded-2xl bg-gray-50 px-4 py-3 text-sm text-gray-700 dark:bg-gray-900/40 dark:text-gray-200">
+            <div class="text-xs text-gray-500 dark:text-gray-400">
+              默认版本
+            </div>
+            <div class="mt-1 font-semibold">
+              {{ defaultSystemConfig.clientVersion }}
+            </div>
+          </div>
+        </div>
+
+        <div class="mb-3 rounded-2xl bg-gray-50 px-4 py-3 text-xs text-gray-500 dark:bg-gray-900/40 dark:text-gray-400">
+          服务器地址与客户端版本通常需要成对调整，建议先在测试环境验证，再同步到生产使用。
+        </div>
+
+        <div class="mb-3 rounded-2xl bg-amber-50 px-4 py-3 text-xs text-amber-800 dark:bg-amber-900/20 dark:text-amber-200">
+          保存后会立刻影响全局连接参数。若服务器地址、平台或系统版本不匹配，可能导致后续账号连接异常。
+        </div>
+
+        <div class="grid grid-cols-2 gap-3 text-sm">
+          <BaseInput
+            v-model="localSystemConfig.serverUrl"
+            label="服务器地址"
+            type="text"
+            placeholder="wss://..."
+            class="col-span-2"
+          />
+          <BaseInput
+            v-model="localSystemConfig.clientVersion"
+            label="客户端版本"
+            type="text"
+            placeholder="1.14.2.15_20260922"
+            class="col-span-2"
+          />
+          <div class="flex flex-col gap-1.5">
+            <label class="text-sm text-gray-700 font-medium dark:text-gray-300">平台</label>
+            <div class="flex gap-2">
+              <button
+                v-for="option in platformOptions"
+                :key="option.value"
+                class="rounded-lg px-3 py-1.5 text-sm transition-all"
+                :class="localSystemConfig.platform === option.value
+                  ? 'text-white shadow-sm'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'"
+                :style="localSystemConfig.platform === option.value ? { backgroundColor: 'var(--theme-primary)' } : {}"
+                @click="localSystemConfig.platform = option.value"
+              >
+                {{ option.label }}
+              </button>
+            </div>
+          </div>
+          <div class="flex flex-col gap-1.5">
+            <label class="text-sm text-gray-700 font-medium dark:text-gray-300">系统</label>
+            <div class="flex gap-2">
+              <button
+                v-for="option in osOptions"
+                :key="option.value"
+                class="rounded-lg px-3 py-1.5 text-sm transition-all"
+                :class="localSystemConfig.os === option.value
+                  ? 'text-white shadow-sm'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'"
+                :style="localSystemConfig.os === option.value ? { backgroundColor: 'var(--theme-primary)' } : {}"
+                @click="localSystemConfig.os = option.value"
+              >
+                {{ option.label }}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-3 flex justify-end gap-2">
+          <BaseButton
+            variant="secondary"
+            size="sm"
+            :loading="systemConfigSaving"
+            @click="$emit('resetSystem')"
+          >
+            重置
+          </BaseButton>
+          <BaseButton
+            v-if="showSave"
+            variant="primary"
+            size="sm"
+            :loading="systemConfigSaving"
+            @click="$emit('saveSystem')"
+          >
+            保存
+          </BaseButton>
+        </div>
+      </div>
+
+      <div v-if="props.section === 'system'" class="border border-gray-200 rounded-lg bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
+        <h4 class="mb-3 flex items-center gap-2 text-base text-gray-900 font-bold dark:text-gray-100">
+          <div class="i-carbon-password" />
+          登录账号
+        </h4>
+        <p class="mb-3 text-xs text-gray-500 dark:text-gray-400">
+          默认账号和密码均为 admin。修改后当前会话会自动刷新，请使用新凭据登录。
+        </p>
+        <div class="grid gap-3 md:grid-cols-2">
+          <BaseInput v-model="adminAuthConfig.username" label="管理员账号" placeholder="admin" />
+          <BaseInput v-model="adminAuthConfig.currentPassword" label="当前密码" type="password" placeholder="请输入当前密码" />
+          <BaseInput v-model="adminAuthConfig.newPassword" label="新密码" type="password" placeholder="至少 4 位" />
+          <BaseInput v-model="adminAuthConfig.confirmPassword" label="确认新密码" type="password" placeholder="再次输入新密码" />
+        </div>
+        <div class="mt-3 flex justify-end">
+          <BaseButton variant="primary" size="sm" :loading="adminAuthSaving" @click="$emit('saveAdminAuth')">
+            保存登录凭据
+          </BaseButton>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</template>
