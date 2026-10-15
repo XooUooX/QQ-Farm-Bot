@@ -13,10 +13,5 @@
     "build:web": "pnpm -C web build",
     "build": "pnpm build:web",
     "install:all": "pnpm install -r"
-  },
-  "pnpm": {
-    "overrides": {
-      "@babel/traverse": "7.26.10"
-    }
   }
 }
