@@ -7,7 +7,7 @@ import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseSelect from '@/components/ui/BaseSelect.vue'
 import BaseSwitch from '@/components/ui/BaseSwitch.vue'
-import { CHARITY_FLOWER_ACTIVITY_WINDOW, isWithinActivityWindowMs, PET_DIARY_ACTIVITY_WINDOW, RAIN_POEM_ACTIVITY_WINDOW, SHARE_REWARD_ACTIVITY_WINDOW, WISH_SIGN_ACTIVITY_WINDOW } from '@/constants/activity-windows'
+import { CHARITY_FLOWER_ACTIVITY_WINDOW, isWithinActivityWindowMs, MILK_TEA_ACTIVITY_WINDOW, MILK_TEA_BUSINESS_WINDOW, PET_DIARY_ACTIVITY_WINDOW, RAIN_POEM_ACTIVITY_WINDOW, SHARE_REWARD_ACTIVITY_WINDOW, WISH_SIGN_ACTIVITY_WINDOW } from '@/constants/activity-windows'
 
 type ModuleKey = 'planting' | 'fertilizer' | 'friends' | 'steal' | 'merchant' | 'activity'
 
@@ -39,6 +39,23 @@ let nowTimer: ReturnType<typeof window.setInterval> | null = null
 const showRainPoemActivity = computed(() => isWithinActivityWindowMs(RAIN_POEM_ACTIVITY_WINDOW, nowMs.value))
 const showCharityFlowerActivity = computed(() => isWithinActivityWindowMs(CHARITY_FLOWER_ACTIVITY_WINDOW, nowMs.value))
 const showPetDiaryActivity = computed(() => isWithinActivityWindowMs(PET_DIARY_ACTIVITY_WINDOW, nowMs.value))
+const showMilkTeaActivity = computed(() => isWithinActivityWindowMs(MILK_TEA_ACTIVITY_WINDOW, nowMs.value))
+const showMilkTeaBusiness = computed(() => isWithinActivityWindowMs(MILK_TEA_BUSINESS_WINDOW, nowMs.value))
+const milkTeaSettings = computed(() => [
+  { key: 'mall_coupon_gift_buy', label: '自动购买点券礼包', detail: '点券足够买完剩余限额时自动购买' },
+  { key: 'milk_tea_cashier', label: '自动领取营业收益', detail: '领取店铺累计营业收益' },
+  { key: 'milk_tea_wages', label: '自动领取工资', detail: '领取已结算的打工工资' },
+  { key: 'milk_tea_share_daily', label: '自动领取每日快乐值', detail: '领取每日快乐值奖励' },
+  { key: 'milk_tea_share_rewards', label: '自动领取快乐值奖励', detail: '领取已达成的快乐值档位奖励' },
+  { key: 'milk_tea_fund_rewards', label: '自动领取成长基金奖励', detail: '仅领取已解锁且达到条件的奖励' },
+  ...(showMilkTeaBusiness.value ? [
+    { key: 'milk_tea_upgrade', label: '自动升级店铺', detail: '营业额达到要求后升级' },
+    { key: 'milk_tea_craft', label: '自动制作奶茶', detail: '加工全部已解锁配方对应的果实' },
+    { key: 'milk_tea_boost', label: '自动使用宣传喇叭', detail: '使用背包中已有的宣传喇叭' },
+    { key: 'milk_tea_hire', label: '自动雇佣员工', detail: '按类型选择首个符合条件的空闲员工' },
+    { key: 'milk_tea_seed_buy', label: '自动购买已解锁种子', detail: '不使用钻石' },
+  ] : []),
+])
 const showWishSignActivity = computed(() => isWithinActivityWindowMs(WISH_SIGN_ACTIVITY_WINDOW, nowMs.value))
 const showShareRewardActivity = computed(() => isWithinActivityWindowMs(SHARE_REWARD_ACTIVITY_WINDOW, nowMs.value))
 
@@ -56,6 +73,7 @@ const fertilizerName = computed(() => props.fertilizerOptions.find(item => item.
 const selectedLandNames = computed(() => props.fertilizerLandTypeOptions.filter(item => automation.value.automation.fertilizer_land_types?.includes(item.value)).map(item => item.label))
 const selectedLandTypeCount = computed(() => Array.isArray(automation.value.automation.fertilizer_land_types) ? automation.value.automation.fertilizer_land_types.length : 0)
 const activityKeys = computed(() => [
+  ...(showMilkTeaActivity.value ? milkTeaSettings.value.map(item => item.key) : []),
   ...(showRainPoemActivity.value
     ? ['rain_poem_bottle_buy', 'rain_poem_weather_collect', 'rain_poem_summon_use', 'rain_poem_prank_use', 'rain_poem_research_unlock']
     : []),
@@ -669,6 +687,22 @@ watch(() => props.currentAccountId, loadQixiFriends)
                 </div>
               </section>
 
+              <section v-if="showMilkTeaActivity" class="border border-amber-200 rounded-xl bg-amber-50/40 p-4 space-y-3 dark:border-amber-900/40 dark:bg-amber-950/10">
+                <h3 class="text-sm text-gray-900 font-semibold dark:text-gray-100">奶茶热销中</h3>
+                <div class="grid grid-cols-1 gap-3 lg:grid-cols-2">
+                  <div v-for="setting in milkTeaSettings" :key="setting.key" class="flex items-center justify-between gap-4 border border-amber-100 rounded-lg bg-white/80 px-3 py-2.5 dark:border-gray-700 dark:bg-gray-900/40">
+                    <div>
+                      <div class="text-sm text-gray-800 font-medium dark:text-gray-200">{{ setting.label }}</div>
+                      <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ setting.detail }}</p>
+                    </div>
+                    <BaseSwitch v-model="automation.automation[setting.key]" class="shrink-0" />
+                  </div>
+                </div>
+                <div v-if="showMilkTeaBusiness" class="grid gap-3 sm:grid-cols-2">
+                  <label class="text-sm">雇佣时长<select v-model.number="automation.automation.milk_tea_hire_duration" class="mt-1 w-full rounded border p-2 dark:bg-gray-900"><option :value="1">4 小时</option><option :value="2">12 小时</option><option :value="3">24 小时</option></select></label>
+                  <label class="text-sm">员工类型<select v-model.number="automation.automation.milk_tea_hire_talent" class="mt-1 w-full rounded border p-2 dark:bg-gray-900"><option :value="0">任意好友</option><option :value="9001">金牌销售</option><option :value="9002">金牌宣传</option><option :value="9003">金牌服务</option><option :value="9004">实习员工</option></select></label>
+                </div>
+              </section>
               <section v-if="showPetDiaryActivity" class="border border-violet-100 rounded-lg p-4 space-y-3 dark:border-violet-900/40">
                 <div>
                   <div class="text-sm text-gray-700 font-medium dark:text-gray-300">

@@ -17,6 +17,7 @@ const { getDataDir } = require('../config/runtime-paths');
 const { createModuleLogger } = require('./logger');
 const { readJsonFile, writeJsonFileAtomic } = require('./json-db');
 const { getBag, getBagItems, useItem } = require('./warehouse');
+const petDiaryHelpers = require('./activity-center-helpers');
 const wishSignRewards = require('../gameConfig/WishSignRewards.json');
 
 const activityLogger = createModuleLogger('activity');
@@ -1238,7 +1239,6 @@ function emptyPetDiaryActivity(warning) {
 // ==================== 萌宠成长日记（S3）====================
 // 上游 activity-center/pet-diary.ts 的本地装配。旧的只读 getPetDiaryActivity 暂时保留，
 // 待前端切到新接口后再移除，避免一次性改动过大。
-const petDiaryHelpers = require('./activity-center-helpers');
 const { createPetDiaryService } = require('./activity-pet-diary');
 
 let petDiaryServiceInstance = null;
@@ -3435,3 +3435,16 @@ module.exports = {
   normalizeNanguaGroup,
   normalizeHeluGroup,
 };
+
+let milkTeaService;
+function getMilkTeaService() {
+  if (!milkTeaService) milkTeaService = require('./activity-milk-tea').createMilkTeaService({
+    types, sendMsgAsync, getBag, getBagItems, getUserState,
+    getServerTimeSec: require('../utils/utils').getServerTimeSec,
+    itemDto: petDiaryHelpers.itemDto,
+  });
+  return milkTeaService;
+}
+module.exports.getMilkTea = () => getMilkTeaService().getMilkTea();
+module.exports.operateMilkTea = (action, params) => getMilkTeaService().operateMilkTea(action, params);
+module.exports.milkTeaRecords = (kind, params) => getMilkTeaService().milkTeaRecords(kind, params);

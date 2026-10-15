@@ -259,6 +259,7 @@ async function runDailyRoutines(force = false, options = {}) {
         await performDailyShare(force);
         await performDailyMonthCardGift(force);
         await buyFreeGifts(force);
+        await require('../services/mall-gift-auto-buy').autoBuyCouponGifts();
         await performDailyVipGift(force);
     } catch (err) {
         log('系统', `每日任务调度失败: ${  err.message}`, {
@@ -286,6 +287,7 @@ function startDailyRoutineTimer() {
             // 分享资格在服务端日切后可能延迟刷新；服务内部有 10 分钟冷却，
             // 持续检查可避免零点单次未命中后必须重连才能领取。
             performDailyShare(false).catch(() => null);
+            if (!friendSyncPaused) require('../services/mall-gift-auto-buy').autoBuyCouponGifts().catch(() => null);
             return;
         }
         lastDailyRunDate = today;
@@ -482,6 +484,7 @@ async function runStarActivityAutoClaims() {
     if (!loginReady || friendSyncPaused || starActivityClaimRunning) return;
 
     const automation = getAutomation() || {};
+    const milkTeaEnabled = Object.keys(require('../services/activity-milk-tea').AUTO_ACTIONS).some(key => automation[key] === true);
     const claimPassport = automation.star_passport_claim === true;
     const claimSolarTerms = automation.star_solar_claim === true;
     const claimRecords = automation.star_record_claim === true;
@@ -521,7 +524,7 @@ async function runStarActivityAutoClaims() {
         || petDiaryTreasureEnabled || petDiaryCompensationEnabled || petDiaryCharmEnabled || petDiaryBattleFlag;
     const qixiFriendPriority = Array.isArray(automation.qixi_friend_priority)
         ? automation.qixi_friend_priority.map(Number).filter(gid => gid > 0) : [];
-    if (!claimPassport && !claimSolarTerms && !claimRecords && !claimQingmeiSeedsEnabled && !brewQingmeiWineEnabled
+    if (!milkTeaEnabled && !claimPassport && !claimSolarTerms && !claimRecords && !claimQingmeiSeedsEnabled && !brewQingmeiWineEnabled
         && !useQixiDewEnabled && !buildQixiBridgeEnabled && !giftQixiSachetEnabled
         && !buyRainPoemBottleEnabled && !collectRainPoemWeatherEnabled && !useRainPoemSummonEnabled && !useRainPoemPrankEnabled
         && !unlockRainPoemResearchEnabled && !claimCharityShareEnabled && !donateCharityLoveEnabled
@@ -885,6 +888,45 @@ async function runStarActivityAutoClaims() {
                 }
             }
             } // end if (rainPoem?.active !== false)
+        }
+
+        if (milkTeaEnabled) {
+            const { AUTO_ACTIONS, phase, normalizeHireOptions } = require('../services/activity-milk-tea');
+            const service = require('../services/activity');
+            for (const [key, action] of Object.entries(AUTO_ACTIONS)) {
+                if (!loginReady || friendSyncPaused || getAutomation()?.[key] !== true) continue;
+                const currentPhase = phase(require('../utils/utils').getServerTimeSec());
+                if (!['business', 'settling'].includes(currentPhase)) break;
+                try {
+                    const state = await service.getMilkTea();
+                    if (!Number(state.summary.shop_open_at) && !['shareDaily', 'shareRewards', 'fundRewards'].includes(action)) continue;
+                    let params = {};
+                    if (action === 'buy') {
+                        const goods = state.goods.find(x => x.category_tag === 'seed' && x.unlocked && x.remaining > 0 && !x.paid && x.affordable);
+                        if (!goods) continue;
+                        params = { goodsId: goods.id, count: 1 };
+                    }
+                    if (action === 'hire') {
+                        const capacity = state.levels.find(x => x.level === Number(state.shop.level))?.employee_slot_count || 0;
+                        const slot = Array.from({ length: capacity }, (_, i) => i).find(i => !state.shop.slots.some(x => Number(x.slot_index) === i && Number(x.end_at) > state.serverTime));
+                        if (slot == null) continue;
+                        const options = getAutomation() || {};
+                        params = { slotIndex: slot, autoSelect: true, ...normalizeHireOptions({ durationId: options.milk_tea_hire_duration, talentId: options.milk_tea_hire_talent }) };
+                    }
+                    if (action === 'cashier' && !state.shop.pending_rewards.some(x => Number(x.count) > 0)) continue;
+                    if (action === 'craft' && !state.recipes.some(recipe => recipe.unlocked && recipe.fruits?.length)) continue;
+                    if (action === 'boost' && !state.balances.some(item => String(item.id) === String(state.shop.sales_item_id) && Number(item.count) > 0)) continue;
+                    if (action === 'wages' && !state.summary.has_unclaimed_wage) continue;
+                    if (action === 'upgrade' && !state.summary.can_upgrade) continue;
+                    if (currentPhase === 'settling' && !['cashier', 'wages', 'shareDaily', 'shareRewards', 'fundRewards'].includes(action)) continue;
+                    if (action === 'shareDaily' && state.share?.daily?.daily_reward_claimed) continue;
+                    if (action === 'shareRewards' && !state.share?.milestones?.some(x => Number(x.state) === 2)) continue;
+                    if (action === 'fundRewards' && (!state.fund?.unlocked || !state.fund.tiers.some(x => Number(x.state) === 2))) continue;
+                    await service.operateMilkTea(action, params);
+                } catch (error) {
+                    if (!error.milkTeaLogged) log('活动', `奶茶热销中自动检查失败：${error.message}`, { module: 'activity', event: '奶茶热销中自动检查', result: 'error' });
+                }
+            }
         }
 
         if (petDiaryAnyEnabled) {
@@ -1294,6 +1336,14 @@ function applyRuntimeConfig(config, syncStatusAfter = false) {
                 workerScheduler.setTimeoutTask('mystery_shop_auto_buy_after_save', 2000, () => {
                     runMysteryShopAutoBuy().catch(() => null);
                 });
+            }
+
+            const milkTeaKeys = Object.keys(require('../services/activity-milk-tea').AUTO_ACTIONS);
+            if (milkTeaKeys.some(key => prevAuto?.[key] !== newAuto?.[key]) && milkTeaKeys.some(key => newAuto?.[key] === true)) {
+                workerScheduler.setTimeoutTask('milk_tea_after_save', 2000, () => runStarActivityAutoClaims().catch(() => null));
+            }
+            if (!prevAuto?.mall_coupon_gift_buy && newAuto?.mall_coupon_gift_buy) {
+                workerScheduler.setTimeoutTask('mall_coupon_gift_buy_after_save', 2000, () => require('../services/mall-gift-auto-buy').autoBuyCouponGifts(true).catch(() => null));
             }
 
             // 每日任务从关变开 → 立即执行一次
@@ -1798,8 +1848,8 @@ async function handleApiCall(msg) {
                 break;
             }
             case 'getMallGoods': {
-                const { getMallGoodsList } = require('../services/mall');
-                result = await getMallGoodsList(0);
+                const { getAllMallGoods } = require('../services/mall');
+                result = await getAllMallGoods();
                 break;
             }
             case 'buyMallGoods': {
@@ -1930,6 +1980,18 @@ async function handleApiCall(msg) {
             case 'getShareRewardActivity': {
                 const activity = require('../services/activity');
                 result = await activity[method]();
+                break;
+            }
+            case 'getMilkTea': {
+                result = await require('../services/activity').getMilkTea();
+                break;
+            }
+            case 'operateMilkTea': {
+                result = await require('../services/activity').operateMilkTea(args[0], args[1] || {});
+                break;
+            }
+            case 'milkTeaRecords': {
+                result = await require('../services/activity').milkTeaRecords(args[0], args[1] || {});
                 break;
             }
             case 'operateWishSign':

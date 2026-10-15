@@ -12,12 +12,13 @@ import RainPoemActivityPanel from '@/components/activity/RainPoemActivityPanel.v
 import StarRecordPanel from '@/components/activity/StarRecordPanel.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import WishShareActivityPanel from '@/components/activity/WishShareActivityPanel.vue'
-import { CHARITY_FLOWER_ACTIVITY_WINDOW, isWithinActivityWindowMs, PET_DIARY_ACTIVITY_WINDOW, RAIN_POEM_ACTIVITY_WINDOW, SHARE_REWARD_ACTIVITY_WINDOW, WISH_SIGN_ACTIVITY_WINDOW } from '@/constants/activity-windows'
+import { CHARITY_FLOWER_ACTIVITY_WINDOW, isWithinActivityWindowMs, MILK_TEA_ACTIVITY_WINDOW, PET_DIARY_ACTIVITY_WINDOW, RAIN_POEM_ACTIVITY_WINDOW, SHARE_REWARD_ACTIVITY_WINDOW, WISH_SIGN_ACTIVITY_WINDOW } from '@/constants/activity-windows'
 import { useAccountStore } from '@/stores/account'
 import { useActivityStore } from '@/stores/activity'
 import { useToastStore } from '@/stores/toast'
 import { useUserStore } from '@/stores/user'
 
+const MilkTeaActivityPanel = defineAsyncComponent(() => import('@/components/activity/MilkTeaActivityPanel.vue'))
 const PetDiaryActivityPanel = defineAsyncComponent(() => import('@/components/activity/PetDiaryActivityPanel.vue'))
 
 const L: ActivityLabels = {
@@ -111,6 +112,7 @@ const charityFlowerActivityActive = computed(() => isWithinActivityWindowMs(CHAR
 const wishSignActivityActive = computed(() => isWithinActivityWindowMs(WISH_SIGN_ACTIVITY_WINDOW, nowMs.value))
 const shareRewardActivityActive = computed(() => isWithinActivityWindowMs(SHARE_REWARD_ACTIVITY_WINDOW, nowMs.value))
 const petDiaryActivityActive = computed(() => isWithinActivityWindowMs(PET_DIARY_ACTIVITY_WINDOW, nowMs.value))
+const milkTeaActivityActive = computed(() => isWithinActivityWindowMs(MILK_TEA_ACTIVITY_WINDOW, nowMs.value))
 const selectedActivity = ref<string | null>(null)
 const activityStatusFilter = ref<'active' | 'upcoming' | 'ended'>('active')
 const activeSection = ref<ActivitySectionKey>('journey')
@@ -205,11 +207,12 @@ const activityCards = computed(() => {
         endTime: RAIN_POEM_ACTIVITY_WINDOW.endMs / 1000,
         activityIds: [2026070300],
       }]
+  if (!source.some(group => group.activityIds.includes(2026110100))) source.push({ id: 2026110100, title: '奶茶热销中', startTime: MILK_TEA_ACTIVITY_WINDOW.startMs / 1000, endTime: MILK_TEA_ACTIVITY_WINDOW.endMs / 1000, activityIds: [2026110100] })
   return source.map((group) => {
     const adaptedKey = group.id === 2026090100
       ? 'pet-diary' as const
       : group.activityIds.includes(2026070300) ? 'rain-poem' as const : group.activityIds.includes(2026090900) ? 'charity-flower' as const : null
-    const adapted = group.activityIds.includes(2026092400) ? 'wish-sign' as const : group.activityIds.includes(2026092500) ? 'share-reward' as const : adaptedKey
+    const adapted = group.activityIds.includes(2026110100) ? 'milk-tea' as const : group.activityIds.includes(2026092400) ? 'wish-sign' as const : group.activityIds.includes(2026092500) ? 'share-reward' as const : adaptedKey
     const window = { startMs: group.startTime * 1000, endMs: group.endTime * 1000 }
     const hue = Math.abs(group.id * 37) % 360
     return {
@@ -218,17 +221,18 @@ const activityCards = computed(() => {
       adaptedKey: adapted,
       title: adapted === 'pet-diary' ? '萌宠日记' : group.title || `活动 ${group.id}`,
       description: adapted
-        ? adapted === 'pet-diary' ? '查看比熊成长、爪印手记、拾物小铺与比熊赠礼' : adapted === 'charity-flower' ? '查看爱心、公益进度与奖励状态' : adapted === 'wish-sign' ? '查看祈愿状态、祈愿池和每日奖励' : adapted === 'share-reward' ? '查看每日快乐值与档位进度' : '查看天气、每日进度与气象研究'
+        ? adapted === 'milk-tea' ? '经营奶茶小店、制作奶茶、雇佣员工并领取活动奖励' : adapted === 'pet-diary' ? '查看比熊成长、爪印手记、拾物小铺与比熊赠礼' : adapted === 'charity-flower' ? '查看爱心、公益进度与奖励状态' : adapted === 'wish-sign' ? '查看祈愿状态、祈愿池和每日奖励' : adapted === 'share-reward' ? '查看每日快乐值与档位进度' : '查看天气、每日进度与气象研究'
         : ACTIVITY_CLIENT_PREVIEWS.some(item => item.title === group.title || item.ids.some(id => group.activityIds.includes(id)))
           ? '已读取客户端静态预览，动态规则待服务端开放'
           : '暂未适配详情',
       icon: {
         '': 'i-carbon-calendar',
+        'milk-tea': 'i-carbon-cafe',
         'pet-diary': 'i-fa-solid-paw',
         'charity-flower': 'i-carbon-favorite',
         'rain-poem': 'i-carbon-rain-heavy', 'wish-sign': 'i-carbon-sun', 'share-reward': 'i-carbon-share',
       }[adapted || ''] || 'i-carbon-calendar',
-      image: adapted === 'pet-diary' ? '/activity/pet-diary/scene-home-adult.webp?v=20260912' : adapted === 'wish-sign' ? '/activity/wish-sign/card-bg.svg' : adapted === 'share-reward' ? '/activity/share-reward/card-bg.svg' : group.imageUrl || (adapted === 'rain-poem' ? '/activity/rain-poem/day-rain-bg.jpg' : ''),
+      image: adapted === 'milk-tea' ? '/activity/milk-tea/img_s4Main_bg.png' : adapted === 'pet-diary' ? '/activity/pet-diary/scene-home-adult.webp?v=20260912' : adapted === 'wish-sign' ? '/activity/wish-sign/card-bg.svg' : adapted === 'share-reward' ? '/activity/share-reward/card-bg.svg' : group.imageUrl || (adapted === 'rain-poem' ? '/activity/rain-poem/day-rain-bg.jpg' : ''),
       imagePosition: adapted === 'pet-diary' ? 'center 64%' : 'center',
       window,
       updatedMs: window.startMs,
@@ -653,6 +657,10 @@ onUnmounted(() => {
       萌宠日记面板自带游戏风格顶栏与返回按钮，且直接读 usePetDiaryStore，
       因此不外挂返回按钮、不传 activity/loading/error props。
     -->
+    <div v-else-if="selectedActivityCard?.adaptedKey === 'milk-tea' && selectedActivityCard.status === 'active'">
+      <MilkTeaActivityPanel v-if="milkTeaActivityActive" @back="selectedActivity = null" />
+      <div v-else class="rounded-lg bg-white p-10 text-center text-sm text-gray-500 shadow dark:bg-gray-800">奶茶热销中活动尚未开始或已经结束。</div>
+    </div>
     <div v-else-if="selectedActivityCard?.adaptedKey === 'pet-diary' && selectedActivityCard.status === 'active'">
       <PetDiaryActivityPanel v-if="petDiaryActivityActive && currentAccountId" @back="selectedActivity = null" />
       <div v-else-if="petDiaryActivityActive && !currentAccountId" class="space-y-3">
