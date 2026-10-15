@@ -1,4 +1,6 @@
-FROM docker.1ms.run/library/node:20-alpine AS builder
+ARG NODE_IMAGE=docker.m.daocloud.io/library/node:20-alpine
+
+FROM ${NODE_IMAGE} AS builder
 
 WORKDIR /app
 
@@ -19,7 +21,7 @@ COPY web ./web
 RUN pnpm build:web
 
 # ==========================================
-FROM docker.1ms.run/library/node:20-alpine AS prod-deps
+FROM ${NODE_IMAGE} AS prod-deps
 
 WORKDIR /app
 
@@ -36,7 +38,7 @@ RUN pnpm -C core install --prod --frozen-lockfile
 
 # ==========================================
 
-FROM docker.1ms.run/library/node:20-alpine AS runner
+FROM ${NODE_IMAGE} AS runner
 
 WORKDIR /app/core
 

@@ -3,6 +3,8 @@ services:
     build:
       context: .
       dockerfile: core/Dockerfile
+      args:
+        NODE_IMAGE: "${NODE_IMAGE:-docker.m.daocloud.io/library/node:20-alpine}"
     image: qq-farm-bot:latest
     container_name: qq-farm-bot
     restart: unless-stopped
